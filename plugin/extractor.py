@@ -13,8 +13,14 @@ from html.parser import HTMLParser
 import logging
 import traceback
 import threading
+import os
 
-if False:
+test_in_anki = True
+
+dir_path = os.path.dirname(os.path.realpath(__file__)).split("\\")[-1]
+# print(dir_path)
+
+if test_in_anki:
     from PyQt5.QtWidgets import *
     from PyQt5.QtCore import *
     from PyQt5.QtGui import *
@@ -23,10 +29,17 @@ if False:
     from aqt import mw
 
     # Variables controlled by the user (can be edited on Addons > Config)
-    config = mw.addonManager.getConfig(__name__)
-    expression_field = config['expressionField']
-    vocab_field = config['vocabField']
-    keybinding = config['keybinding'] #nothing by default
+    # dir_path = os.path.dirname(os.path.realpath(__file__)).split(r"\"")[-1]
+    # print(dir_path)
+    config = mw.addonManager.getConfig(dir_path)
+    try:
+        expression_field = config['expressionField']
+        vocab_field = config['vocabField']
+        keybinding = config['keybinding'] #nothing by default
+    except:
+        expression_field = "Expression"
+        vocab_field = "Vocab"
+        keybinding = ""  # nothing by default
 
 # Labels
 # text shown while processing cards
@@ -187,7 +200,7 @@ def add_to_context_menu(view, menu):
     a.setShortcut(QKeySequence(keybinding))
 
 
-if False:
+if test_in_anki:
     def on_regen_vocab(ed):
         """
         main function
