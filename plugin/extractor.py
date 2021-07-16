@@ -4,11 +4,15 @@
 
 # parts of the code are copied from renato's work (https://github.com/rgamici)
 
+# Note to self: I use if False: because I haven't cloned the Anki repo yet
+# so pycharm doesn't recofnize aqt, anki, etc.
+
 from io import StringIO
 from html.parser import HTMLParser
 
 import logging
 import traceback
+import threading
 
 if False:
     from PyQt5.QtWidgets import *
@@ -20,8 +24,8 @@ if False:
 
     # Variables controlled by the user (can be edited on Addons > Config)
     config = mw.addonManager.getConfig(__name__)
-    expressionField = config['expressionField']
-    definitionField = config['definitionField']
+    expression_field = config['expressionField']
+    vocab_field = config['vocabField']
     keybinding = config['keybinding'] #nothing by default
 
 # Labels
@@ -36,7 +40,7 @@ sample_sentence = r"<ruby><rb>僕</rb><rt>ぼく</rt></ruby>に<ruby><rb>勝手"
 sample2 = r"dasdasd<b>僕</b>dasdasdasdsa dasdsa dasdas dasdsadasdas"
 # print(sample2.split("<b>")[1].split("</b>")[0])
 
-# https://stackoverflow.com/questions/2081640/what-exactly-do-u-and-r-string-flags-do-and-what-are-raw-string-literals
+# https://stackoverflow.com/questions/753052/strip-html-from-strings-in-python
 class MLStripper(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -79,10 +83,11 @@ class Regen():
     def __init__(self, ed, fids):
         self.ed = ed
         self.fids = fids
-        self.completed = 0
         # ed.selectedNotes
         self.completed = 0
         self.config = mw.addonManager.getConfig(__name__)
+        self.sema = threading.BoundedSemaphore(config['max_threads'])
+        self.values = {}
         if len(self.fids) == 1:
             # Single card selected, need to deselect it before updating
             self.row = self.ed.currentRow()
@@ -92,31 +97,80 @@ class Regen():
             label=label_progress_update,
             value=0)
 
-    def get_vocab(self, sentence):
-        """return the bolded word from the sentence"""
+    def _get_vocab_(self, sentence):
+        """
+        return the bolded word from the sentence
+        """
         # return an empty string if sentence is empty
-        return sentence.split("<b>")[1].split("</b>")[0] if sentence else ""
+        # return an HTML-stripped vocab just to be sure an clean
+        return strip_tags(sentence.split("<b>")[1].split("</b>")[0]) if sentence else ""
 
-    def prepare(self):
+    def generate(self):
         fs = [mw.col.getNote(id=fid) for fid in self.fids]
         i = 0
         for f in fs:
             try:
-                if self.config['force_update'] == 'no' and f[definitionField]:
+                # vocab field already contains something
+                if self.config['force_update'] == 'no' and f[vocab_field]:
                     self.completed += 1
                     mw.progress.update(
                         label=label_progress_update,
                         value=self.completed)
+
+                elif not f[vocab_field]:
+                    # vocab_field is empty
+                    f[vocab_field] = self._get_vocab_(f[expression_field])
+
+                elif self.config['force_update'] == 'yes' and f[vocab_field]:
+                    f[vocab_field] = self._get_vocab_(f[expression_field])
+
                 else:
-                    # main shit that updates the vocab field
+                    pass
             except:
                 print('definitions failed:')
                 traceback.print_exc()
 
+    # def wait_threads(self):
+    #     """Wait for threads to finish and then update definitions"""
+    #     for i, _ in self.values.items():
+    #         thread = self.values[i]['thread']
+    #         thread.join()
+    #         self.update_def(i)
+    #     mw.progress.finish()
+    #     if len(self.fids) == 1:
+    #         # restore the selection of the single card
+    #         self.ed.form.tableView.selectRow(self.row)
+
+    # def update_def(self, i):
+    #     """Update definition of note stored in dict with key `i`"""
+    #     f = self.values[i]['f']
+    #     try:
+    #         if self.values[i]['definition'] == '':
+    #             f.addTag(self.config['error_tag'])
+    #         if self.config['force_update'] == "append":
+    #             if f[vocab_field] and (self.values[i]['definition'] != ''):
+    #                 f[vocab_field] += self.config['update_separator']
+    #             f[vocab_field] += self.values[i]['definition']
+    #         else:
+    #             f[vocab_field] = self.values[i]['definition']
+    #     except:
+    #         print('definitions failed:')
+    #         traceback.print_exc()
+    #     try:
+    #         f.flush()
+    #     except:
+    #         raise Exception()
+    #     self.completed += 1
+    #     mw.progress.update(
+    #         label=label_progress_update,
+    #         value=self.completed)
+
 
 
 def setup_menu(ed):
-    """Add entry in Edit menu"""
+    """
+    Add entry in Edit menu
+    """
     a = QAction(label_menu, ed)
     a.triggered.connect(lambda _, e=ed: on_regen_vocab(e))
     ed.form.menuEdit.addAction(a)
@@ -124,7 +178,9 @@ def setup_menu(ed):
 
 
 def add_to_context_menu(view, menu):
-    """Add entry to context menu (right click)"""
+    """
+    Add entry to context menu (right click)
+    """
     menu.addSeparator()
     a = menu.addAction(label_menu)
     a.triggered.connect(lambda _, e=view: on_regen_vocab(e))
@@ -133,9 +189,11 @@ def add_to_context_menu(view, menu):
 
 if False:
     def on_regen_vocab(ed):
-        """main function"""
+        """
+        main function
+        """
         regen = Regen(ed, ed.selectedNotes())
-        regen.prepare()
+        regen.generate()
         mw.requireReset()
 
     addHook('browser.setupMenus', setup_menu)
