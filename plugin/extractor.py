@@ -99,8 +99,8 @@ class Regen():
         # ed.selectedNotes
         self.completed = 0
         self.config = mw.addonManager.getConfig(__name__)
-        self.sema = threading.BoundedSemaphore(config['max_threads'])
-        self.values = {}
+        # self.sema = threading.BoundedSemaphore(config['max_threads'])
+        # self.values = {}
         if len(self.fids) == 1:
             # Single card selected, need to deselect it before updating
             self.row = self.ed.currentRow()
