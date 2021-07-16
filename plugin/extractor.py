@@ -48,6 +48,9 @@ label_menu = 'Extract Vocab wrapped in <b></b> from Sentence field'
 
 ## TO DO's
 # fix how anki can't fucking find the config file
+# understand what mw.progress.finish() does
+# try actually catching errors from try: f.flush()
+# handle cases where the sentence is empty
 
 # https://stackoverflow.com/questions/753052/strip-html-from-strings-in-python
 class MLStripper(HTMLParser):
@@ -73,11 +76,14 @@ def get_vocab(sentence):
     """
     # return an empty string if sentence is empty
     # return an HTML-stripped vocab just to be sure an clean
-    sentence = str(sentence)
-    if sentence:
-        return strip_tags(sentence.split("<b>")[1].split("</b>")[0])
-    else:
-        return ""
+    try:
+        sentence = str(sentence)
+        if sentence != "" and len(sentence.split("<b>")) == 2:
+            return strip_tags(sentence.split("<b>")[1].split("</b>")[0])
+        elif sentence == "":
+            return ""
+    except:
+        raise
 
 class Regen():
     """Used to organize the work flow to update the selected cards
@@ -117,20 +123,30 @@ class Regen():
     def generate(self):
         fs = [mw.col.getNote(id=fid) for fid in self.fids]
         for f in fs:
+            # empty sentence field (probably very rare)
+            if not f[expression_field]:
+                continue
+
             try:
                 # vocab field already contains something
                 if force_update == 'no' and f[vocab_field]:
                     # do nothing, count it as progress
                     self._update_progress()
+                    mw.progress.finish()
+                    continue
 
-                elif not f[vocab_field]:
-                    # vocab_field is empty
-                    f[vocab_field] += get_vocab(f[expression_field])
-                    self._update_progress()
+                elif not f[vocab_field] and r"<b>" in str(f[expression_field]):
+                    # vocab_field is empty, fill it
+                    f[vocab_field] = get_vocab(f[expression_field])
 
-                elif force_update == 'yes' and f[vocab_field]:
-                    f[vocab_field] += get_vocab(f[expression_field])
                     self._update_progress()
+                    mw.progress.finish()
+
+                elif force_update == 'yes' and f[vocab_field] and r"<b>" in str(f[expression_field]):
+                    f[vocab_field] += get_vocab(f[expression_field])
+
+                    self._update_progress()
+                    mw.progress.finish()
 
                 else:
                     pass
@@ -142,10 +158,10 @@ class Regen():
             try:
                 f.flush()
             except:
-                raise Exception()
+                pass
 
+            # just a fail-safe
             if self.completed >= len(self.fids):
-                f.flush()
                 mw.progress.finish()
                 return
 
