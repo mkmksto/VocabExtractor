@@ -1,0 +1,7 @@
+{"expressionField": "Vocab",
+ "definitionField": "Glossary",
+ "force_update": "no",
+ "update_separator": "<br>",
+ "keybinding": "",
+ "error_tag": "FetchError"
+}
