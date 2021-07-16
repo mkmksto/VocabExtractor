@@ -40,6 +40,7 @@ if test_in_anki:
         expression_field = "Expression"
         vocab_field = "Vocab"
         keybinding = ""  # nothing by default
+        force_update = "no"
 
 # Labels
 # text shown while processing cards
@@ -124,7 +125,7 @@ class Regen():
         for f in fs:
             try:
                 # vocab field already contains something
-                if self.config['force_update'] == 'no' and f[vocab_field]:
+                if force_update == 'no' and f[vocab_field]:
                     self.completed += 1
                     mw.progress.update(
                         label=label_progress_update,
@@ -134,7 +135,7 @@ class Regen():
                     # vocab_field is empty
                     f[vocab_field] = self._get_vocab_(f[expression_field])
 
-                elif self.config['force_update'] == 'yes' and f[vocab_field]:
+                elif force_update == 'yes' and f[vocab_field]:
                     f[vocab_field] = self._get_vocab_(f[expression_field])
 
                 else:
