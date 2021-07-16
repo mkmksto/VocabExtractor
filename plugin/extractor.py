@@ -11,6 +11,8 @@ if True:
     from PyQt5.QtWidgets import *
     from PyQt5.QtCore import *
     from PyQt5.QtGui import *
+    from anki.hooks import addHook
+    from anki.notes import Note
     from aqt import mw
 
 # Variables controlled by the user (can be edited on Addons > Config)
