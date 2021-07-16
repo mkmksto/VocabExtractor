@@ -14,6 +14,7 @@ from html.parser import HTMLParser
 
 import traceback
 import os
+import re
 
 test_in_anki = True
 
@@ -25,18 +26,21 @@ if test_in_anki:
     from PyQt5.QtCore import *
     from PyQt5.QtGui import *
     from anki.hooks import addHook
+    from aqt.utils import showInfo
     from aqt import mw
 
     # Variables controlled by the user (can be edited on Addons > Config)
     # dir_path = os.path.dirname(os.path.realpath(__file__)).split(r"\"")[-1]
     # print(dir_path)
-    config = mw.addonManager.getConfig(dir_path)
+
     try:
+        config = mw.addonManager.getConfig(dir_path)
         expression_field = config['expressionField']
         vocab_field = config['vocabField']
         keybinding = config['keybinding'] #nothing by default
-    except:
-        expression_field = "Expression"
+    except Exception as e:
+        # expression_field = 'Expression'
+        expression_field = 'Reading'
         vocab_field = "Vocab"
         keybinding = ""  # nothing by default
         force_update = "no"
@@ -50,16 +54,18 @@ label_menu = 'Extract Vocab wrapped in <b></b> from Sentence field'
 # fix how anki can't fucking find the config file
 # understand what mw.progress.finish() does
 # try actually catching errors from try: f.flush()
-# handle cases where the sentence is empty
+# handle cases where the sentence is empty (implemented but not yet tested)
+# create a utils.py and use it to trace calls, also create a .log file
+# use showInfo() to provide a summary of what happened after running the program
 
 # https://stackoverflow.com/questions/753052/strip-html-from-strings-in-python
 class MLStripper(HTMLParser):
     def __init__(self):
         super().__init__()
         self.reset()
-        self.strict = False
-        self.convert_charrefs= True
-        self.text = StringIO()
+        self.strict             = False
+        self.convert_charrefs   = True
+        self.text               = StringIO()
     def handle_data(self, d):
         self.text.write(d)
     def get_data(self):
@@ -82,8 +88,33 @@ def get_vocab(sentence):
             return strip_tags(sentence.split("<b>")[1].split("</b>")[0])
         elif sentence == "":
             return ""
-    except:
+    except Exception as e:
+        showInfo('failed to extract vocab from a specific card, because - {}'.format(str(e)))
         raise
+
+def remove_furigana(sentence):
+    """
+    Only use this function if expression_field = 'Reading' (i.e. the sentence field with furigana)
+    AND
+    if the '[' or ']' in expression_field
+    https://stackoverflow.com/questions/14596884/remove-text-between-and
+    """
+    try:
+        return re.sub("[\(\[].*?[\)\]]", "", sentence)
+    except Exception as e:
+        showInfo('failed to remove furigana - {}'.format(str(e)))
+
+def remove_ruby(sentence):
+    """
+    Only use this if expression_field = 'Reading'
+    AND
+    if <rt> in expression_field
+    """
+    try:
+        sentence = sentence.replace('<ruby>', '').replace('</ruby>', '').replace('<rb>', '').replace('</rb>', '')
+        return re.sub("<rt>.*?</rt>", "", sentence)
+    except Exception as e:
+        showInfo('failed to remove furigana - {}'.format(str(e)))
 
 class Regen():
     """Used to organize the work flow to update the selected cards
@@ -97,11 +128,11 @@ class Regen():
            Track how many cards were already processed
        """
     def __init__(self, ed, fids):
-        self.ed = ed
+        self.ed         = ed
         # ed.selectedNotes
-        self.fids = fids
-        self.completed = 0
-        self.config = mw.addonManager.getConfig(__name__)
+        self.fids       = fids
+        self.completed  = 0
+        # self.config     = mw.addonManager.getConfig(__name__)
         if len(self.fids) == 1:
             # Single card selected, need to deselect it before updating
             self.row = self.ed.currentRow()
@@ -122,10 +153,17 @@ class Regen():
 
     def generate(self):
         fs = [mw.col.getNote(id=fid) for fid in self.fids]
+
         for f in fs:
             # empty sentence field (probably very rare)
             if not f[expression_field]:
                 continue
+
+            sent = str(f[expression_field])
+            if '[' in sent and expression_field == 'Reading':
+                sent = remove_furigana(sent)
+            elif '<rt>' in sent and expression_field == 'Reading':
+                sent = remove_ruby(sent)
 
             try:
                 # vocab field already contains something
@@ -135,34 +173,36 @@ class Regen():
                     mw.progress.finish()
                     continue
 
-                elif not f[vocab_field] and r"<b>" in str(f[expression_field]):
+                elif not f[vocab_field] and r"<b>" in sent:
                     # vocab_field is empty, fill it
-                    f[vocab_field] = get_vocab(f[expression_field])
-
+                    f[vocab_field] = get_vocab(sent)
                     self._update_progress()
                     mw.progress.finish()
 
-                elif force_update == 'yes' and f[vocab_field] and r"<b>" in str(f[expression_field]):
-                    f[vocab_field] += get_vocab(f[expression_field])
-
+                elif force_update == 'yes' and f[vocab_field] and r"<b>" in sent:
+                    f[vocab_field] += get_vocab(sent)
                     self._update_progress()
                     mw.progress.finish()
 
                 else:
                     pass
-            except:
-                print('definitions failed:')
-                raise
-                # traceback.print_exc()
+
+            except Exception as e:
+                showInfo('error from generate() function, - {}'.format(str(e)))
 
             try:
                 f.flush()
-            except:
+            except Exception as e:
                 pass
 
             # just a fail-safe
             if self.completed >= len(self.fids):
                 mw.progress.finish()
+                showInfo('Extraction done for {} out of {} notes done'.format(
+                                                                        self.completed,
+                                                                        len(self.fids)
+                                                                        ))
+
                 return
 
 def setup_menu(ed):
