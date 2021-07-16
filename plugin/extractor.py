@@ -40,17 +40,10 @@ if test_in_anki:
         keybinding = ""  # nothing by default
         force_update = "no"
 
-# Labels
 # text shown while processing cards
 label_progress_update = 'Generating Japanese definitions...'
 # text shown on menu to run the functions
 label_menu = 'Extract Vocab wrapped in <b></b> from Sentence field'
-
-sample_sentence = r"<ruby><rb>僕</rb><rt>ぼく</rt></ruby>に<ruby><rb>勝手" \
-                  r"</rb><rt>かって</rt></ruby>に、<ruby><rb>人</rb><rt>ひと</rt></ruby>を<b><ruby><rb" \
-                  r">裁</rb><rt>さば</rt></ruby>く</b><ruby><rb>権利</rb><rt>けんり</rt></ruby>があるのか？"
-sample2 = r"dasdasd<b>僕</b>dasdasdasdsa dasdsa dasdas dasdsadasdas"
-# print(sample2.split("<b>")[1].split("</b>")[0])
 
 # https://stackoverflow.com/questions/753052/strip-html-from-strings-in-python
 class MLStripper(HTMLParser):
@@ -104,10 +97,10 @@ class Regen():
             # Single card selected, need to deselect it before updating
             self.row = self.ed.currentRow()
             self.ed.form.tableView.selectionModel().clear()
-        # mw.progress.start(max=len(self.fids), immediate=True)
-        # mw.progress.update(
-        #     label=label_progress_update,
-        #     value=0)
+        mw.progress.start(max=len(self.fids), immediate=True)
+        mw.progress.update(
+            label=label_progress_update,
+            value=0)
 
     def _get_vocab_(self, sentence):
         """
@@ -117,23 +110,28 @@ class Regen():
         # return an HTML-stripped vocab just to be sure an clean
         return strip_tags(sentence.split("<b>")[1].split("</b>")[0]) if sentence else ""
 
+    def _update_progress(self):
+        self.completed += 1
+        mw.progress.update(
+            label=label_progress_update,
+            value=self.completed)
+
     def generate(self):
         fs = [mw.col.getNote(id=fid) for fid in self.fids]
         for f in fs:
             try:
                 # vocab field already contains something
                 if force_update == 'no' and f[vocab_field]:
-                    self.completed += 1
-                    # mw.progress.update(
-                    #     label=label_progress_update,
-                    #     value=self.completed)
+                    self._update_progress()
 
                 elif not f[vocab_field]:
                     # vocab_field is empty
-                    f[vocab_field] = self._get_vocab_(f[expression_field])
+                    f[vocab_field] += self._get_vocab_(f[expression_field])
+                    self._update_progress()
 
                 elif force_update == 'yes' and f[vocab_field]:
-                    f[vocab_field] = self._get_vocab_(f[expression_field])
+                    f[vocab_field] += self._get_vocab_(f[expression_field])
+                    self._update_progress()
 
                 else:
                     pass
@@ -161,14 +159,13 @@ def add_to_context_menu(view, menu):
     a.setShortcut(QKeySequence(keybinding))
 
 
-if test_in_anki:
-    def on_regen_vocab(ed):
-        """
-        main function
-        """
-        regen = Regen(ed, ed.selectedNotes())
-        regen.generate()
-        mw.requireReset()
+def on_regen_vocab(ed):
+    """
+    main function
+    """
+    regen = Regen(ed, ed.selectedNotes())
+    regen.generate()
+    mw.requireReset()
 
-    addHook('browser.setupMenus', setup_menu)
-    addHook('browser.onContextMenu', add_to_context_menu)
+addHook('browser.setupMenus', setup_menu)
+addHook('browser.onContextMenu', add_to_context_menu)
