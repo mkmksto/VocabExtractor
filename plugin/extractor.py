@@ -7,7 +7,7 @@
 from io import StringIO
 from html.parser import HTMLParser
 
-if False:
+if True:
     from PyQt5.QtWidgets import *
     from PyQt5.QtCore import *
     from PyQt5.QtGui import *
