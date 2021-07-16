@@ -10,9 +10,7 @@
 from io import StringIO
 from html.parser import HTMLParser
 
-import logging
 import traceback
-import threading
 import os
 
 test_in_anki = True
@@ -106,10 +104,10 @@ class Regen():
             # Single card selected, need to deselect it before updating
             self.row = self.ed.currentRow()
             self.ed.form.tableView.selectionModel().clear()
-        mw.progress.start(max=len(self.fids), immediate=True)
-        mw.progress.update(
-            label=label_progress_update,
-            value=0)
+        # mw.progress.start(max=len(self.fids), immediate=True)
+        # mw.progress.update(
+        #     label=label_progress_update,
+        #     value=0)
 
     def _get_vocab_(self, sentence):
         """
@@ -121,15 +119,14 @@ class Regen():
 
     def generate(self):
         fs = [mw.col.getNote(id=fid) for fid in self.fids]
-        i = 0
         for f in fs:
             try:
                 # vocab field already contains something
                 if force_update == 'no' and f[vocab_field]:
                     self.completed += 1
-                    mw.progress.update(
-                        label=label_progress_update,
-                        value=self.completed)
+                    # mw.progress.update(
+                    #     label=label_progress_update,
+                    #     value=self.completed)
 
                 elif not f[vocab_field]:
                     # vocab_field is empty
@@ -143,43 +140,6 @@ class Regen():
             except:
                 print('definitions failed:')
                 traceback.print_exc()
-
-    # def wait_threads(self):
-    #     """Wait for threads to finish and then update definitions"""
-    #     for i, _ in self.values.items():
-    #         thread = self.values[i]['thread']
-    #         thread.join()
-    #         self.update_def(i)
-    #     mw.progress.finish()
-    #     if len(self.fids) == 1:
-    #         # restore the selection of the single card
-    #         self.ed.form.tableView.selectRow(self.row)
-
-    # def update_def(self, i):
-    #     """Update definition of note stored in dict with key `i`"""
-    #     f = self.values[i]['f']
-    #     try:
-    #         if self.values[i]['definition'] == '':
-    #             f.addTag(self.config['error_tag'])
-    #         if self.config['force_update'] == "append":
-    #             if f[vocab_field] and (self.values[i]['definition'] != ''):
-    #                 f[vocab_field] += self.config['update_separator']
-    #             f[vocab_field] += self.values[i]['definition']
-    #         else:
-    #             f[vocab_field] = self.values[i]['definition']
-    #     except:
-    #         print('definitions failed:')
-    #         traceback.print_exc()
-    #     try:
-    #         f.flush()
-    #     except:
-    #         raise Exception()
-    #     self.completed += 1
-    #     mw.progress.update(
-    #         label=label_progress_update,
-    #         value=self.completed)
-
-
 
 def setup_menu(ed):
     """
@@ -212,4 +172,3 @@ if test_in_anki:
 
     addHook('browser.setupMenus', setup_menu)
     addHook('browser.onContextMenu', add_to_context_menu)
-
