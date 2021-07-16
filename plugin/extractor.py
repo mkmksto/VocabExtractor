@@ -63,7 +63,7 @@ def strip_tags(html):
     s.feed(html)
     return s.get_data()
 
-def get_vocab(self, sentence):
+def get_vocab(sentence):
     """
     return the bolded word from the sentence
     """
@@ -118,6 +118,7 @@ class Regen():
             label=label_progress_update,
             value=self.completed)
         if self.completed >= len(self.fids):
+            mw.progress.finish()
             return
 
     def generate(self):
@@ -151,6 +152,7 @@ class Regen():
 
             if self.completed >= len(self.fids):
                 f.flush()
+                mw.progress.finish()
                 return
 
 def setup_menu(ed):
