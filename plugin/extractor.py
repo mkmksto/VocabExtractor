@@ -3,9 +3,11 @@
 # License: GNU AGPL, version 3 or later; https://www.gnu.org/licenses/agpl-3.0.en.html
 
 # parts of the code are copied from renato's work (https://github.com/rgamici)
+# Description: Just a stupidly simple program that extracts a word wrapped in <b></b>
+# and puts it into a dst field, yeah I'm lazy
 
 # Note to self: I use if False: because I haven't cloned the Anki repo yet
-# so pycharm doesn't recofnize aqt, anki, etc.
+# so pycharm doesn't recognize aqt, anki, etc.
 
 from io import StringIO
 from html.parser import HTMLParser
@@ -23,7 +25,6 @@ if test_in_anki:
     from PyQt5.QtCore import *
     from PyQt5.QtGui import *
     from anki.hooks import addHook
-    from anki.notes import Note
     from aqt import mw
 
     # Variables controlled by the user (can be edited on Addons > Config)
@@ -44,6 +45,9 @@ if test_in_anki:
 label_progress_update = 'Generating Japanese definitions...'
 # text shown on menu to run the functions
 label_menu = 'Extract Vocab wrapped in <b></b> from Sentence field'
+
+## TO DO's
+# fix how anki can't fucking find the config file
 
 # https://stackoverflow.com/questions/753052/strip-html-from-strings-in-python
 class MLStripper(HTMLParser):
@@ -85,24 +89,13 @@ class Regen():
            List of selected cards
        completed : int
            Track how many cards were already processed
-       config : dict
-           Stores the user's (customized) parameters
-
-       Methods
-       ------
-       prepare()
-           Check cards that have to be processed and create threads
-           NOTE: the try/except block comes from the original code and it was
-                 preserved to avoid unknown errors, it may be useless
        """
     def __init__(self, ed, fids):
         self.ed = ed
-        self.fids = fids
         # ed.selectedNotes
+        self.fids = fids
         self.completed = 0
         self.config = mw.addonManager.getConfig(__name__)
-        # self.sema = threading.BoundedSemaphore(config['max_threads'])
-        # self.values = {}
         if len(self.fids) == 1:
             # Single card selected, need to deselect it before updating
             self.row = self.ed.currentRow()
@@ -127,6 +120,7 @@ class Regen():
             try:
                 # vocab field already contains something
                 if force_update == 'no' and f[vocab_field]:
+                    # do nothing, count it as progress
                     self._update_progress()
 
                 elif not f[vocab_field]:
