@@ -63,7 +63,17 @@ def strip_tags(html):
     s.feed(html)
     return s.get_data()
 
-# if string/vocab is empty, do nothing
+def get_vocab(self, sentence):
+    """
+    return the bolded word from the sentence
+    """
+    # return an empty string if sentence is empty
+    # return an HTML-stripped vocab just to be sure an clean
+    sentence = str(sentence)
+    if sentence:
+        return strip_tags(sentence.split("<b>")[1].split("</b>")[0])
+    else:
+        return ""
 
 class Regen():
     """Used to organize the work flow to update the selected cards
@@ -102,19 +112,13 @@ class Regen():
             label=label_progress_update,
             value=0)
 
-    def _get_vocab_(self, sentence):
-        """
-        return the bolded word from the sentence
-        """
-        # return an empty string if sentence is empty
-        # return an HTML-stripped vocab just to be sure an clean
-        return strip_tags(sentence.split("<b>")[1].split("</b>")[0]) if sentence else ""
-
     def _update_progress(self):
         self.completed += 1
         mw.progress.update(
             label=label_progress_update,
             value=self.completed)
+        if self.completed >= len(self.fids):
+            return
 
     def generate(self):
         fs = [mw.col.getNote(id=fid) for fid in self.fids]
@@ -126,11 +130,11 @@ class Regen():
 
                 elif not f[vocab_field]:
                     # vocab_field is empty
-                    f[vocab_field] += self._get_vocab_(f[expression_field])
+                    f[vocab_field] += get_vocab(f[expression_field])
                     self._update_progress()
 
                 elif force_update == 'yes' and f[vocab_field]:
-                    f[vocab_field] += self._get_vocab_(f[expression_field])
+                    f[vocab_field] += get_vocab(f[expression_field])
                     self._update_progress()
 
                 else:
@@ -144,6 +148,10 @@ class Regen():
                 f.flush()
             except:
                 raise Exception()
+
+            if self.completed >= len(self.fids):
+                f.flush()
+                return
 
 def setup_menu(ed):
     """
