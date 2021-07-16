@@ -25,6 +25,10 @@ label_progress_update = 'Generating Japanese definitions...'
 # text shown on menu to run the functions
 label_menu = 'Extract Vocab wrapped in <b></b> from Sentence field'
 
+sample_sentence = r"<ruby><rb>僕</rb><rt>ぼく</rt></ruby>に<ruby><rb>勝手" \
+                  r"</rb><rt>かって</rt></ruby>に、<ruby><rb>人</rb><rt>ひと</rt></ruby>を<b><ruby><rb" \
+                  r">裁</rb><rt>さば</rt></ruby>く</b><ruby><rb>権利</rb><rt>けんり</rt></ruby>があるのか？"
+
 # https://stackoverflow.com/questions/2081640/what-exactly-do-u-and-r-string-flags-do-and-what-are-raw-string-literals
 class MLStripper(HTMLParser):
     def __init__(self):
