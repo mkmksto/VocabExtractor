@@ -88,3 +88,6 @@ def addToContextMenu(view, menu):
 #     regen.wait_threads()
 #     mw.requireReset()
 
+addHook('browser.setupMenus', setupMenu)
+addHook('browser.onContextMenu', addToContextMenu)
+
