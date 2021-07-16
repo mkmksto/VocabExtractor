@@ -137,7 +137,13 @@ class Regen():
                     pass
             except:
                 print('definitions failed:')
-                traceback.print_exc()
+                raise
+                # traceback.print_exc()
+
+            try:
+                f.flush()
+            except:
+                raise Exception()
 
 def setup_menu(ed):
     """
@@ -165,6 +171,7 @@ def on_regen_vocab(ed):
     """
     regen = Regen(ed, ed.selectedNotes())
     regen.generate()
+    mw.reset()
     mw.requireReset()
 
 addHook('browser.setupMenus', setup_menu)
