@@ -9,6 +9,8 @@
 # Note to self: I use if False: because I haven't cloned the Anki repo yet
 # so pycharm doesn't recognize aqt, anki, etc.
 
+# TODO: you can use ichi.moe's vocab info to deconjugate stuff, but idk, i'm too lazy, haven't felt the need for it yet
+
 from io import StringIO
 from html.parser import HTMLParser
 
