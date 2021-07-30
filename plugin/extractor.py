@@ -23,7 +23,7 @@ import time
 import os
 import re
 
-test_in_anki = False
+test_in_anki = True
 
 dir_path = os.path.dirname(os.path.realpath(__file__)).split("\\")[-1]
 # print(dir_path)
@@ -78,7 +78,7 @@ class MLStripper(HTMLParser):
     def get_data(self):
         return self.text.getvalue()
 
-def strip_tags(html):
+def _strip_tags(html):
     s = MLStripper()
     s.feed(html)
     return s.get_data()
@@ -92,7 +92,7 @@ def get_vocab(sentence):
     try:
         sentence = str(sentence)
         if sentence != "" and len(sentence.split("<b>")) == 2:
-            return strip_tags(sentence.split("<b>")[1].split("</b>")[0])
+            return _strip_tags(sentence.split("<b>")[1].split("</b>")[0])
         elif sentence == "":
             return ""
     except Exception as e:
@@ -215,12 +215,12 @@ if test_in_anki:
 
                     elif not f[vocab_field] and r"<b>" in sent:
                         # vocab_field is empty, fill it
-                        f[vocab_field] = get_vocab(sent)
+                        f[vocab_field] = jisho_deconjugate(get_vocab(sent))
                         self._update_progress()
                         mw.progress.finish()
 
                     elif force_update == 'yes' and f[vocab_field] and r"<b>" in sent:
-                        f[vocab_field] += get_vocab(sent)
+                        f[vocab_field] += jisho_deconjugate(get_vocab(sent))
                         self._update_progress()
                         mw.progress.finish()
 
