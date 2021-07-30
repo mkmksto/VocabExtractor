@@ -53,7 +53,7 @@ if test_in_anki:
         force_update = "no"
 
 # text shown while processing cards
-label_progress_update = 'Generating Japanese definitions...'
+label_progress_update = 'Extracting <b>Vocab</b> in deconjugated form from JISHO'
 # text shown on menu to run the functions
 label_menu = 'Extract Vocab wrapped in <b></b> from Sentence field'
 
@@ -123,7 +123,6 @@ def remove_ruby(sentence):
     except Exception as e:
         showInfo('failed to remove furigana - {}'.format(str(e)))
 
-
 def jisho_deconjugate(vocab):
     """
     https://github.com/lsrdg/jisho-karini/blob/master/jisho-karini.py
@@ -140,7 +139,7 @@ def jisho_deconjugate(vocab):
             try:
                 response = urllib.request.urlopen(url)
             except Exception as e:
-                time.sleep(0.02)
+                time.sleep(0.03)
 
     response = BeautifulSoup(response, features='html.parser')
 
