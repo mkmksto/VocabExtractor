@@ -17,7 +17,6 @@ from io import StringIO
 import urllib.request
 import urllib.parse
 
-import traceback
 import json
 import time
 import os
@@ -26,31 +25,25 @@ import re
 test_in_anki = True
 
 dir_path = os.path.dirname(os.path.realpath(__file__)).split("\\")[-1]
-# print(dir_path)
 
-if test_in_anki:
-    from PyQt5.QtWidgets import *
-    from PyQt5.QtCore import *
-    from PyQt5.QtGui import *
-    from anki.hooks import addHook
-    from aqt.utils import showInfo
-    from aqt import mw
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from anki.hooks import addHook
+from aqt.utils import showInfo
+from aqt import mw
 
-    # Variables controlled by the user (can be edited on Addons > Config)
-    # dir_path = os.path.dirname(os.path.realpath(__file__)).split(r"\"")[-1]
-    # print(dir_path)
-
-    try:
-        config = mw.addonManager.getConfig(dir_path)
-        expression_field = config['expressionField']
-        vocab_field = config['vocabField']
-        keybinding = config['keybinding'] #nothing by default
-    except Exception as e:
-        # expression_field = 'Expression'
-        expression_field = 'Reading'
-        vocab_field = "Vocab"
-        keybinding = ""  # nothing by default
-        force_update = "no"
+try:
+    config = mw.addonManager.getConfig(dir_path)
+    expression_field = config['expressionField']
+    vocab_field = config['vocabField']
+    keybinding = config['keybinding'] #nothing by default
+except Exception as e:
+    # expression_field = 'Expression'
+    expression_field = 'Reading'
+    vocab_field = "Vocab"
+    keybinding = ""  # nothing by default
+    force_update = "no"
 
 # text shown while processing cards
 label_progress_update = 'Extracting <b>Vocab</b> in deconjugated form from JISHO'
@@ -167,140 +160,140 @@ def jisho_deconjugate(vocab: str) -> str or None:
         return None
 
 
-if test_in_anki:
-    class Regen():
-        """Used to organize the work flow to update the selected cards
-           Attributes
-           ----------
-           ed :
-               Anki Card browser object
-           fids :
-               List of selected cards
-           completed : int
-               Track how many cards were already processed
-           """
-        def __init__(self, ed, fids):
-            self.ed         = ed
-            # ed.selectedNotes
-            self.fids       = fids
-            self.completed  = 0
-            # self.config     = mw.addonManager.getConfig(__name__)
-            if len(self.fids) == 1:
-                # Single card selected, need to deselect it before updating
-                self.row = self.ed.currentRow()
-                self.ed.form.tableView.selectionModel().clear()
-            mw.progress.start(max=len(self.fids), immediate=True)
-            mw.progress.update(
-                label=label_progress_update,
-                value=0)
+class Regen:
+    """Used to organize the work flow to update the selected cards
+       Attributes
+       ----------
+       ed :
+           Anki Card browser object
+       fids :
+           List of selected cards
+       completed : int
+           Track how many cards were already processed
+       """
+    def __init__(self, ed, fids):
+        self.ed         = ed
+        # ed.selectedNotes
+        self.fids       = fids
+        self.completed  = 0
+        # self.config     = mw.addonManager.getConfig(__name__)
+        if len(self.fids) == 1:
+            # Single card selected, need to deselect it before updating
+            self.row = self.ed.currentRow()
+            self.ed.form.tableView.selectionModel().clear()
+        mw.progress.start(max=len(self.fids), immediate=True)
+        mw.progress.update(
+            label=label_progress_update,
+            value=0)
 
-        def _update_progress(self):
-            self.completed += 1
-            mw.progress.update(
-                label=label_progress_update,
-                value=self.completed)
-            if self.completed >= len(self.fids):
-                mw.progress.finish()
-                return
+    def _update_progress(self):
+        self.completed += 1
+        mw.progress.update(
+            label=label_progress_update,
+            value=self.completed)
+        if self.completed >= len(self.fids):
+            mw.progress.finish()
+            return
 
-        def generate(self):
-            fs = [mw.col.getNote(id=fid) for fid in self.fids]
+    def generate(self):
+        fs = [mw.col.getNote(id=fid) for fid in self.fids]
 
-            for f in fs:
-                # empty sentence field (probably very rare)
-                if not f[expression_field]:
-                    continue
+        for f in fs:
+            # empty sentence field (probably very rare)
+            if not f[expression_field]:
+                self._update_progress()
+                continue
 
-                sent = str(f[expression_field])
-                if '[' in sent and expression_field == 'Reading':
-                    sent = remove_furigana(sent)
-                elif '<rt>' in sent and expression_field == 'Reading':
-                    sent = remove_ruby(sent)
+            sent = str(f[expression_field])
+            if '[' in sent and expression_field == 'Reading':
+                sent = remove_furigana(sent)
+            elif '<rt>' in sent and expression_field == 'Reading':
+                sent = remove_ruby(sent)
 
-                plain_vocab = get_vocab(sent)
-                # probably nothing enclosed in <b> (usually happens when I review the entire sentence)
-                if plain_vocab is None:
+            plain_vocab = get_vocab(sent)
+            # probably nothing enclosed in <b> (usually happens when I review the entire sentence)
+            if plain_vocab is None:
+                self._update_progress()
+                continue
+
+            deconjugated_vocab = jisho_deconjugate(plain_vocab)
+            if deconjugated_vocab is None:
+                self._update_progress()
+                continue
+
+            deconjugated_vocab = deconjugated_vocab if deconjugated_vocab else plain_vocab
+
+            try:
+                # vocab field already contains something
+                if force_update == 'no' and f[vocab_field]:
+                    # do nothing, count it as progress
                     self._update_progress()
+                    mw.progress.finish()
                     continue
 
-                deconjugated_vocab = jisho_deconjugate(plain_vocab)
-                if deconjugated_vocab is None:
+                elif not f[vocab_field] and r"<b>" in sent:
+                    # vocab_field is empty, fill it
+                    f[vocab_field] = deconjugated_vocab
                     self._update_progress()
-                    continue
+                    mw.progress.finish()
 
-                deconjugated_vocab = deconjugated_vocab if deconjugated_vocab else plain_vocab
+                elif force_update == 'yes' and f[vocab_field] and r"<b>" in sent:
+                    f[vocab_field] += deconjugated_vocab
+                    self._update_progress()
+                    mw.progress.finish()
 
-                try:
-                    # vocab field already contains something
-                    if force_update == 'no' and f[vocab_field]:
-                        # do nothing, count it as progress
-                        self._update_progress()
-                        mw.progress.finish()
-                        continue
-
-                    elif not f[vocab_field] and r"<b>" in sent:
-                        # vocab_field is empty, fill it
-                        f[vocab_field] = deconjugated_vocab
-                        self._update_progress()
-                        mw.progress.finish()
-
-                    elif force_update == 'yes' and f[vocab_field] and r"<b>" in sent:
-                        f[vocab_field] += deconjugated_vocab
-                        self._update_progress()
-                        mw.progress.finish()
-
-                    else:
-                        pass
-
-                except Exception as e:
-                    showInfo('error from generate() function, - {}'.format(str(e)))
-
-                try:
-                    f.flush()
-                except Exception as e:
+                else:
                     pass
 
-                # just a fail-safe
-                if self.completed >= len(self.fids):
-                    mw.progress.finish()
-                    showInfo('Extraction done for {} out of {} notes done'.format(
-                                                                            self.completed,
-                                                                            len(self.fids)
-                                                                            ))
+            except Exception as e:
+                showInfo('error from generate() function, - {}'.format(str(e)))
 
-                    return
+            try:
+                f.flush()
+            except Exception as e:
+                pass
 
-    def setup_menu(ed):
-        """
-        Add entry in Edit menu
-        """
-        a = QAction(label_menu, ed)
-        a.triggered.connect(lambda _, e=ed: on_regen_vocab(e))
-        ed.form.menuEdit.addAction(a)
-        a.setShortcut(QKeySequence(keybinding))
+            # just a fail-safe
+            if self.completed >= len(self.fids):
+                mw.progress.finish()
+                showInfo('Extraction done for {} out of {} notes done'.format(
+                                                                        self.completed,
+                                                                        len(self.fids)
+                                                                        ))
 
+                return
 
-    def add_to_context_menu(view, menu):
-        """
-        Add entry to context menu (right click)
-        """
-        menu.addSeparator()
-        a = menu.addAction(label_menu)
-        a.triggered.connect(lambda _, e=view: on_regen_vocab(e))
-        a.setShortcut(QKeySequence(keybinding))
+def setup_menu(ed):
+    """
+    Add entry in Edit menu
+    """
+    a = QAction(label_menu, ed)
+    a.triggered.connect(lambda _, e=ed: on_regen_vocab(e))
+    ed.form.menuEdit.addAction(a)
+    a.setShortcut(QKeySequence(keybinding))
 
 
-    def on_regen_vocab(ed):
-        """
-        main function
-        """
-        regen = Regen(ed, ed.selectedNotes())
-        regen.generate()
-        mw.reset()
-        mw.requireReset()
+def add_to_context_menu(view, menu):
+    """
+    Add entry to context menu (right click)
+    """
+    menu.addSeparator()
+    a = menu.addAction(label_menu)
+    a.triggered.connect(lambda _, e=view: on_regen_vocab(e))
+    a.setShortcut(QKeySequence(keybinding))
 
-    addHook('browser.setupMenus', setup_menu)
-    addHook('browser.onContextMenu', add_to_context_menu)
+
+def on_regen_vocab(ed):
+    """
+    main function
+    """
+    regen = Regen(ed, ed.selectedNotes())
+    regen.generate()
+    mw.reset()
+    mw.requireReset()
+
+addHook('browser.setupMenus', setup_menu)
+addHook('browser.onContextMenu', add_to_context_menu)
 
 # testing inside pycharm
 sample_word = '食べちゃった'
