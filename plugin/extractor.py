@@ -123,35 +123,48 @@ def remove_ruby(sentence):
     except Exception as e:
         showInfo('failed to remove furigana - {}'.format(str(e)))
 
-def jisho_deconjugate(vocab):
+def jisho_deconjugate(vocab: str) -> str or None:
     """
     https://github.com/lsrdg/jisho-karini/blob/master/jisho-karini.py
     https://jisho.org/forum/54fefc1f6e73340b1f160000-is-there-any-kind-of-search-api
     """
 
-    url = 'https://jisho.org/api/v1/search/words?keyword={}'.format(urllib.parse.quote(vocab.encode('utf-8')))
+    # to prevent Attribute error (NoneType has no attribute encode)
+    # prob when the sentence doesn't have anything in bold
+    if vocab:
+        url = 'https://jisho.org/api/v1/search/words?keyword={}'.format(urllib.parse.quote(vocab.encode('utf-8')))
 
-    num_retries = 10
-    try:
-        response = urllib.request.urlopen(url)
-    except Exception as e:
-        for i in range(num_retries):
+        num_retries = 10
+        response = None
+        try:
+            response = urllib.request.urlopen(url)
+        except Exception as e:
+            for i in range(num_retries):
+                try:
+                    response = urllib.request.urlopen(url)
+                except Exception as e:
+                    time.sleep(0.03)
+
+        if response:
+            response = BeautifulSoup(response, features='html.parser')
+            response_json: dict = json.loads(str(response))
             try:
-                response = urllib.request.urlopen(url)
+                # jisho returns nothing inside its 'data' key
+                response_data: dict = response_json.get('data')[0]
+            except IndexError:
+                return None
+            try:
+                deconjugated        = response_data.get('slug')
             except Exception as e:
-                time.sleep(0.03)
+                showInfo(f'error from ->response_data.get(slug)-<: {e}')
+                raise
 
-    response = BeautifulSoup(response, features='html.parser')
+            return deconjugated
+        else:
+            return None
 
-    if response:
-        response_json = json.loads(str(response))
-        response_data = response_json['data'][0]
-        # print(response_data)
-        deconjugated = response_data['slug']
     else:
-        return
-
-    return deconjugated
+        return None
 
 
 if test_in_anki:
@@ -204,6 +217,19 @@ if test_in_anki:
                 elif '<rt>' in sent and expression_field == 'Reading':
                     sent = remove_ruby(sent)
 
+                plain_vocab = get_vocab(sent)
+                # probably nothing enclosed in <b> (usually happens when I review the entire sentence)
+                if plain_vocab is None:
+                    self._update_progress()
+                    continue
+
+                deconjugated_vocab = jisho_deconjugate(plain_vocab)
+                if deconjugated_vocab is None:
+                    self._update_progress()
+                    continue
+
+                deconjugated_vocab = deconjugated_vocab if deconjugated_vocab else plain_vocab
+
                 try:
                     # vocab field already contains something
                     if force_update == 'no' and f[vocab_field]:
@@ -214,12 +240,12 @@ if test_in_anki:
 
                     elif not f[vocab_field] and r"<b>" in sent:
                         # vocab_field is empty, fill it
-                        f[vocab_field] = jisho_deconjugate(get_vocab(sent))
+                        f[vocab_field] = deconjugated_vocab
                         self._update_progress()
                         mw.progress.finish()
 
                     elif force_update == 'yes' and f[vocab_field] and r"<b>" in sent:
-                        f[vocab_field] += jisho_deconjugate(get_vocab(sent))
+                        f[vocab_field] += deconjugated_vocab
                         self._update_progress()
                         mw.progress.finish()
 
